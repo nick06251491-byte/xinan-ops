@@ -10,7 +10,7 @@
 <style>
 :root{--bg:#0f0e0c;--card:#191714;--line:#2c2820;--fg:#f1ece2;--mute:#9a9283;--gold:#c9a24a;--todo:#26231d;--doing:#c9a24a;--doing-fg:#1b1405;--done:#3f8f6b;--done-fg:#fff}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 "Noto Sans TC",-apple-system,"PingFang TC",sans-serif;padding-block:0 56px}
+html{overflow-anchor:none}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 "Noto Sans TC",-apple-system,"PingFang TC",sans-serif;padding-block:0 56px}
 header{border-bottom:1px solid var(--gold);padding:14px max(16px,env(safe-area-inset-right)) 12px max(16px,env(safe-area-inset-left))}
 .wrap{max-width:900px;margin:0 auto}
 .brand{font-family:"Noto Serif TC",serif;color:var(--gold);font-size:20px;font-weight:700;line-height:1.1}
@@ -167,7 +167,7 @@ function render(){
   if(bfil!=="全部"&&!(bfil in bc))bfil="全部";
   chips("bfilters","b",bfil,["全部",...Object.keys(bc).sort((x,y)=>bc[y]-bc[x]||x.localeCompare(y))],v=>v==="全部"?"全部品牌":v+" "+bc[v]);
   chips("sfilters","s",sfil,["全部",...SERIES],v=>v);
-  const g=$("grid");g.replaceChildren();setTimeout(()=>window.scrollTo(0,sy),0);
+  const g=$("grid");g.style.minHeight=g.offsetHeight+"px";g.replaceChildren();
   if(!list.length)g.append(el("div","empty","目前沒有符合的車輛"));
   for(const c of list){
     const n=doneCount(c),card=el("div","car"),P=pend[c.id]||{};
@@ -209,6 +209,7 @@ function render(){
   for(const f of document.querySelectorAll(".add")){if(keep[f.dataset.id]){const i=f.querySelector("input");i.value=keep[f.dataset.id];if(f.dataset.id===activeId)i.focus()}}
   const last=cars.reduce((m,c)=>(c.updated_at||"")>m?c.updated_at:m,"");
   $("foot").textContent=last?"最後更新："+fmt(last):"";
+  window.scrollTo(0,sy);g.style.minHeight="";requestAnimationFrame(()=>window.scrollTo(0,sy));
 }
 async function load(){
   if(busy)return;
