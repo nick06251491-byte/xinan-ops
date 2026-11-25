@@ -41,6 +41,27 @@ h1{font-family:"Noto Serif TC",serif;font-size:30px;margin:0 0 6px;line-height:1
 .who{display:flex;gap:8px;align-items:center;margin:0 0 16px;flex-wrap:wrap;font-size:13.5px;color:var(--mute)}
 .who select,.who input{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:150px}
 .add{display:flex;gap:6px}
+.car-h .l{display:flex;gap:10px;align-items:center;min-width:0}
+.av{width:52px;height:52px;border-radius:10px;border:1px solid var(--line);background:var(--todo);color:var(--gold);font:700 20px "Noto Serif TC",serif;display:grid;place-items:center;overflow:hidden;padding:0;cursor:pointer;flex:none}
+.av img{width:100%;height:100%;object-fit:cover;display:block}
+.add .cam{background:var(--todo);color:var(--fg)}
+.gal{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.gal button{flex:none;width:76px;height:76px;border:1px solid var(--line);border-radius:8px;padding:0;overflow:hidden;background:var(--todo);cursor:pointer}
+.gal img{width:100%;height:100%;object-fit:cover;display:block}
+.galh{font-size:12px;color:var(--mute);margin:0}
+.pv{height:64px;width:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
+.pvs{display:flex;gap:8px;flex-wrap:wrap}
+#lb{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:50;padding:16px;cursor:zoom-out}
+#lb.on{display:flex}
+#lb img{max-width:100%;max-height:82vh;object-fit:contain;border-radius:6px}
+#lb p{margin:0;color:var(--fg);font-size:14px;text-align:center}
+.newbox{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px;display:flex;flex-direction:column;gap:10px}
+.newbox[hidden]{display:none}
+.newbox input[type=text]{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-width:0}
+.newrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.newrow button{font:inherit;border:0;border-radius:8px;padding:9px 14px;cursor:pointer;background:var(--todo);color:var(--fg)}
+.newrow button.go{background:var(--gold);color:var(--doing-fg);font-weight:700}
+.addbtn{font:inherit;background:var(--gold);color:var(--doing-fg);font-weight:700;border:0;border-radius:999px;padding:7px 14px;cursor:pointer}
 .st.pend{outline:2px dashed var(--gold);outline-offset:1px}
 .confirm{border:1px solid var(--gold);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;background:#211c10}
 .cmsg{font-size:13.5px;overflow-wrap:anywhere}
@@ -74,6 +95,12 @@ footer{margin-top:28px;font-size:12px;color:var(--mute)}
     <div><b id="n-all">0</b><span>整備中</span></div>
     <div><b id="n-done">0</b><span>全部完成</span></div>
   </div>
+  <div class="filters" style="margin-bottom:10px"><button class="addbtn" id="addbtn" type="button">＋ 新增車輛</button></div>
+  <div class="newbox" id="newbox" hidden>
+    <input type="text" id="nname" maxlength="30" placeholder="車款（例：賓士 350D）">
+    <div class="newrow"><button type="button" id="npick">選頭貼照片</button><img class="pv" id="npv" alt="" hidden><span class="hint" id="nhint" style="font-size:12px;color:var(--mute)">頭貼照片（選填，可日後再補）</span></div>
+    <div class="newrow"><button type="button" class="go" id="nok">確認新增</button><button type="button" id="ncancel">取消</button></div>
+  </div>
   <div class="filters" id="filters">
     <button data-f="all" class="on">全部</button>
     <button data-f="doing">整備中</button>
@@ -82,18 +109,36 @@ footer{margin-top:28px;font-size:12px;color:var(--mute)}
   <div class="grid" id="grid"></div>
   <footer id="foot"></footer>
 </div></main>
+<input type="file" id="avIn" accept="image/*" hidden>
+<input type="file" id="phIn" accept="image/*" hidden>
+<input type="file" id="nIn" accept="image/*" hidden>
+<div id="lb" role="dialog" aria-label="照片"><img alt=""><p></p></div>
 <script>
-const SB="https://aaltpysmoejezdwzhmur.supabase.co/rest/v1",KEY="sb_publishable_VKq846Cfaik7DZSwZOJ2sw_sfZZU3WS";
+const BASE="https://aaltpysmoejezdwzhmur.supabase.co",SB=BASE+"/rest/v1",KEY="sb_publishable_VKq846Cfaik7DZSwZOJ2sw_sfZZU3WS";
 const H={apikey:KEY,Authorization:"Bearer "+KEY,"Content-Type":"application/json"};
 const STEPS=[["t","過戶"],["c","認證"],["r","修理"],["w","洗車"],["p","拍照"],["g","定價"]];
 const LBL=["未做","進行中","完成"];
-let cars=[],logs={},filter="all",busy=false,pend={},sending=false;
+let cars=[],logs={},filter="all",busy=false,pend={},sending=false,newPhoto=null,target=null;
 const $=id=>document.getElementById(id);
 function fmt(s){const d=new Date(s);if(isNaN(d))return"";return(d.getMonth()+1)+"/"+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}
 function doneCount(c){return STEPS.filter(([k])=>(c.steps||{})[k]===2).length}
 function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
 try{$("me").value=localStorage.getItem("xo_me")||""}catch(e){}
 $("me").addEventListener("input",()=>{try{localStorage.setItem("xo_me",$("me").value.trim())}catch(e){}$("me").classList.remove("need")});
+function needMe(){const me=$("me").value.trim();if(!me){$("me").classList.add("need");$("me").focus();return null}return me}
+/* photos */
+function compress(file){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),img=new Image();
+  img.onload=()=>{const m=1280,sc=Math.min(1,m/Math.max(img.width,img.height)),w=Math.round(img.width*sc),h=Math.round(img.height*sc);
+    const cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);URL.revokeObjectURL(url);
+    cv.toBlob(b=>b?res({blob:b,url:URL.createObjectURL(b)}):rej(),"image/jpeg",.82)};
+  img.onerror=()=>{URL.revokeObjectURL(url);rej()};img.src=url})}
+async function upload(p){const name=Date.now().toString(36)+Math.random().toString(36).slice(2,8)+".jpg";
+  const r=await fetch(BASE+"/storage/v1/object/car-photos/"+name,{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+KEY,"Content-Type":"image/jpeg"},body:p.blob});
+  if(!r.ok)throw 0;return BASE+"/storage/v1/object/public/car-photos/"+name}
+function openLb(src,cap){const lb=$("lb");lb.querySelector("img").src=src;lb.querySelector("p").textContent=cap||"";lb.classList.add("on")}
+$("lb").addEventListener("click",()=>$("lb").classList.remove("on"));
+document.addEventListener("keydown",e=>{if(e.key==="Escape")$("lb").classList.remove("on")});
+/* render */
 function render(){
   const keep={};document.querySelectorAll(".add").forEach(f=>{const v=f.querySelector("input").value;if(v)keep[f.dataset.id]=v});
   const active=document.activeElement&&document.activeElement.closest&&document.activeElement.closest(".add");const activeId=active&&active.dataset.id;
@@ -104,27 +149,40 @@ function render(){
   const g=$("grid");g.replaceChildren();
   if(!list.length)g.append(el("div","empty","目前沒有符合的車輛"));
   for(const c of list){
-    const n=doneCount(c),card=el("div","car");
-    const h=el("div","car-h");h.append(el("h2","",c.name||"未命名"),el("span","badge"+(n===6?" all":""),n+"/6"));
+    const n=doneCount(c),card=el("div","car"),P=pend[c.id]||{};
+    const h=el("div","car-h"),l=el("div","l");
+    const av=el("button","av");av.type="button";av.dataset.id=c.id;av.dataset.a="av";av.setAttribute("aria-label",c.name+" 更換頭貼");
+    const src=P.avatar?P.avatar.url:c.photo;
+    if(src){const im=el("img");im.src=src;im.alt="";av.append(im)}else av.textContent=(c.name||"?").slice(0,1);
+    l.append(av,el("h2","",c.name||"未命名"));
+    h.append(l,el("span","badge"+(n===6?" all":""),n+"/6"));
     const st=el("div","steps");
-    const P=pend[c.id]||{};
     for(const[k,name]of STEPS){const has=P.steps&&k in P.steps;const v=has?P.steps[k]:((c.steps||{})[k]||0);const b=el("button","st s"+v+(has?" pend":""),name);b.type="button";b.dataset.id=c.id;b.dataset.k=k;b.setAttribute("aria-label",c.name+" "+name+" "+LBL[v]+(has?"（待確認）":""));b.append(el("small","",has?LBL[v]+"?":LBL[v]));st.append(b)}
     card.append(h,st);
     if(c.price!=null&&c.price!=="")card.append(el("div","price",c.price+" 萬"));
     if(c.note)card.append(el("div","note",c.note));
-    const ad=el("form","add");ad.dataset.id=c.id;const ai=el("input");ai.type="text";ai.placeholder="補充備註（例：冷氣要換、等零件）";ai.maxLength=120;ai.setAttribute("aria-label","補充備註");const ab=el("button","go","加入備註");ab.type="submit";ad.append(ai,ab);card.append(ad);
-    if(P.steps&&Object.keys(P.steps).length||P.note){
+    const L=logs[c.id]||[];
+    const ph=L.filter(x=>x.photo).slice(0,12);
+    if(ph.length){card.append(el("p","galh","拍照回報（點開看大圖）"));const gl=el("div","gal");
+      for(const x of ph){const b=el("button");b.type="button";b.dataset.a="lb";b.dataset.src=x.photo;b.dataset.cap=fmt(x.at)+" "+(x.who||"")+" "+(x.text||"");b.setAttribute("aria-label","看照片 "+b.dataset.cap);const im=el("img");im.src=x.photo;im.loading="lazy";im.alt="";b.append(im);gl.append(b)}
+      card.append(gl)}
+    const ad=el("form","add");ad.dataset.id=c.id;const ai=el("input");ai.type="text";ai.placeholder="補充備註（例：冷氣要換、等零件）";ai.maxLength=120;ai.setAttribute("aria-label","補充備註");
+    const cam=el("button","cam","拍照");cam.type="button";cam.dataset.a="cam";cam.dataset.id=c.id;
+    const ab=el("button","go","加入備註");ab.type="submit";ad.append(ai,cam,ab);card.append(ad);
+    if((P.steps&&Object.keys(P.steps).length)||P.note||P.photo||P.avatar){
       const bar=el("div","confirm");bar.dataset.id=c.id;
       const parts=[];for(const[k,v]of Object.entries(P.steps||{}))parts.push(STEPS.find(x=>x[0]===k)[1]+" → "+LBL[v]);
       if(P.note)parts.push("備註：「"+P.note+"」");
+      if(P.photo)parts.push("附上拍照回報");
+      if(P.avatar)parts.push("更換頭貼");
       bar.append(el("div","cmsg","待確認："+parts.join("；")));
+      if(P.photo||P.avatar){const pv=el("div","pvs");for(const x of[P.avatar,P.photo])if(x){const im=el("img","pv");im.src=x.url;im.alt="";pv.append(im)}bar.append(pv)}
       const row=el("div","crow");
       const ok=el("button","cok","確認更新");ok.type="button";ok.dataset.a="ok";
       const no=el("button","cno","取消");no.type="button";no.dataset.a="no";
       row.append(ok,no);bar.append(row);card.append(bar)}
-    const L=logs[c.id]||[];
     if(L.length){const ul=el("ul","log");
-      for(const l of L.slice(0,4)){const li=el("li");li.append(fmt(l.at)+"　");if(l.src==="LINE")li.append(el("span","tag","LINE"));li.append(el("b","",l.who||""),"　"+(l.text||""));ul.append(li)}
+      for(const x of L.slice(0,4)){const li=el("li");li.append(fmt(x.at)+"　");if(x.src==="LINE")li.append(el("span","tag","LINE"));li.append(el("b","",x.who||""),"　"+(x.text||""));ul.append(li)}
       card.append(ul)}
     g.append(card)}
   for(const f of document.querySelectorAll(".add")){if(keep[f.dataset.id]){const i=f.querySelector("input");i.value=keep[f.dataset.id];if(f.dataset.id===activeId)i.focus()}}
@@ -136,49 +194,80 @@ async function load(){
   try{
     const [a,b]=await Promise.all([
       fetch(SB+"/cars?select=*",{headers:H,cache:"no-store"}),
-      fetch(SB+"/car_log?select=*&order=at.desc&limit=300",{headers:H,cache:"no-store"})]);
+      fetch(SB+"/car_log?select=*&order=at.desc&limit=400",{headers:H,cache:"no-store"})]);
     if(!a.ok||!b.ok)throw 0;
     cars=await a.json();logs={};for(const l of await b.json())(logs[l.car_id]=logs[l.car_id]||[]).push(l);
     render();
   }catch(e){$("foot").textContent="讀取失敗，請稍後重試"}
 }
-function needMe(){const me=$("me").value.trim();if(!me){$("me").classList.add("need");$("me").focus();return null}return me}
+/* clicks */
 $("grid").addEventListener("click",async e=>{
-  const ok=e.target.closest("[data-a]");
-  if(ok){
-    const id=ok.closest(".confirm").dataset.id;
-    if(ok.dataset.a==="no"){delete pend[id];render();return}
-    const me=needMe();if(!me||sending)return;
-    const P=pend[id];if(!P)return;
-    sending=true;busy=true;ok.disabled=true;ok.textContent="送出中…";
-    try{
-      const r=await fetch(SB+"/cars?id=eq."+encodeURIComponent(id)+"&select=*",{headers:H,cache:"no-store"});
-      const c=(await r.json())[0];if(!c)throw 0;
-      const body={updated_at:new Date().toISOString()},texts=[];
-      if(P.steps&&Object.keys(P.steps).length){body.steps={...c.steps,...P.steps};
-        for(const[k,v]of Object.entries(P.steps))texts.push(STEPS.find(x=>x[0]===k)[1]+" "+LBL[v])}
-      if(P.note){const line="["+fmt(new Date())+" "+me+"] "+P.note;body.note=c.note?c.note+"\n"+line:line;texts.push("備註："+P.note)}
-      const p=await fetch(SB+"/cars?id=eq."+encodeURIComponent(id),{method:"PATCH",headers:H,body:JSON.stringify(body)});
-      if(!p.ok)throw 0;
-      await fetch(SB+"/car_log",{method:"POST",headers:H,body:JSON.stringify({car_id:id,who:me,src:"web",text:texts.join("、")})});
-      delete pend[id];
-    }catch(err){$("foot").textContent="更新失敗，請再按一次確認"}
-    sending=false;busy=false;await load();render();return}
+  const t=e.target.closest("[data-a]");
+  if(t){const a=t.dataset.a;
+    if(a==="lb"){openLb(t.dataset.src,t.dataset.cap);return}
+    if(a==="av"){if(!needMe())return;target=t.dataset.id;$("avIn").value="";$("avIn").click();return}
+    if(a==="cam"){if(!needMe())return;target=t.dataset.id;$("phIn").value="";$("phIn").click();return}
+    const id=t.closest(".confirm").dataset.id;
+    if(a==="no"){delete pend[id];render();return}
+    if(a==="ok"){
+      const me=needMe();if(!me||sending)return;
+      const P=pend[id];if(!P)return;
+      sending=true;busy=true;t.disabled=true;t.textContent="送出中…";
+      try{
+        const r=await fetch(SB+"/cars?id=eq."+encodeURIComponent(id)+"&select=*",{headers:H,cache:"no-store"});
+        const c=(await r.json())[0];if(!c)throw 0;
+        const body={updated_at:new Date().toISOString()},texts=[];let photoUrl=null;
+        if(P.steps&&Object.keys(P.steps).length){body.steps={...c.steps,...P.steps};
+          for(const[k,v]of Object.entries(P.steps))texts.push(STEPS.find(x=>x[0]===k)[1]+" "+LBL[v])}
+        if(P.avatar){body.photo=await upload(P.avatar);texts.push("更新頭貼")}
+        if(P.photo)photoUrl=await upload(P.photo);
+        if(P.note||photoUrl){const line="["+fmt(new Date())+" "+me+"] "+(P.note||"拍照回報")+(photoUrl?"（附照片）":"");
+          body.note=c.note?c.note+"\n"+line:line;texts.push((P.note?"備註："+P.note:"拍照回報")+(photoUrl?"（附照片）":""))}
+        const p=await fetch(SB+"/cars?id=eq."+encodeURIComponent(id),{method:"PATCH",headers:H,body:JSON.stringify(body)});
+        if(!p.ok)throw 0;
+        await fetch(SB+"/car_log",{method:"POST",headers:H,body:JSON.stringify({car_id:id,who:me,src:"web",text:texts.join("、"),photo:photoUrl})});
+        delete pend[id];
+      }catch(err){$("foot").textContent="更新失敗，請再按一次確認"}
+      sending=false;busy=false;await load();render();return}
+    return}
   const b=e.target.closest(".st");if(!b)return;
   if(!needMe())return;
   const id=b.dataset.id,k=b.dataset.k,c=cars.find(x=>x.id===id);if(!c)return;
   const P=pend[id]=pend[id]||{steps:{}};P.steps=P.steps||{};
   const cur=(c.steps||{})[k]||0,base=k in P.steps?P.steps[k]:cur,nv=(base+1)%3;
   if(nv===cur)delete P.steps[k];else P.steps[k]=nv;
-  if(!Object.keys(P.steps).length&&!P.note)delete pend[id];
-  render();
+  cleanPend(id);render();
 });
+function cleanPend(id){const P=pend[id];if(P&&!Object.keys(P.steps||{}).length&&!P.note&&!P.photo&&!P.avatar)delete pend[id]}
 $("grid").addEventListener("submit",e=>{
   e.preventDefault();const f=e.target.closest(".add");if(!f)return;
   const inp=f.querySelector("input"),txt=inp.value.trim();
   if(!needMe()||!txt)return;
   const P=pend[f.dataset.id]=pend[f.dataset.id]||{steps:{}};
   P.note=P.note?P.note+"；"+txt:txt;inp.value="";render();
+});
+async function stage(inp,key){
+  const f=inp.files&&inp.files[0];if(!f||!target)return;
+  try{const p=await compress(f);const P=pend[target]=pend[target]||{steps:{}};P[key]=p;render()}catch(e){$("foot").textContent="這張照片無法使用，請換一張"}
+}
+$("avIn").addEventListener("change",()=>stage($("avIn"),"avatar"));
+$("phIn").addEventListener("change",()=>stage($("phIn"),"photo"));
+/* add car */
+$("addbtn").addEventListener("click",()=>{if(!needMe())return;$("newbox").hidden=!$("newbox").hidden;if(!$("newbox").hidden)$("nname").focus()});
+$("npick").addEventListener("click",()=>{$("nIn").value="";$("nIn").click()});
+$("nIn").addEventListener("change",async()=>{const f=$("nIn").files[0];if(!f)return;try{newPhoto=await compress(f);$("npv").src=newPhoto.url;$("npv").hidden=false}catch(e){$("nhint").textContent="這張照片無法使用，請換一張"}});
+$("ncancel").addEventListener("click",()=>{$("newbox").hidden=true;$("nname").value="";newPhoto=null;$("npv").hidden=true});
+$("nok").addEventListener("click",async()=>{
+  const me=needMe(),name=$("nname").value.trim();if(!me||!name||sending){if(!name)$("nname").focus();return}
+  sending=true;busy=true;$("nok").disabled=true;$("nok").textContent="新增中…";
+  try{
+    const id="c"+Date.now().toString(36);const url=newPhoto?await upload(newPhoto):null;
+    const r=await fetch(SB+"/cars",{method:"POST",headers:H,body:JSON.stringify({id,name,photo:url,updated_at:new Date().toISOString()})});
+    if(!r.ok)throw 0;
+    await fetch(SB+"/car_log",{method:"POST",headers:H,body:JSON.stringify({car_id:id,who:me,src:"web",text:"新增車輛",photo:url})});
+    $("newbox").hidden=true;$("nname").value="";newPhoto=null;$("npv").hidden=true;
+  }catch(err){$("foot").textContent="新增失敗，請再試一次"}
+  sending=false;busy=false;$("nok").disabled=false;$("nok").textContent="確認新增";await load();
 });
 document.getElementById("filters").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;filter=b.dataset.f;
   document.querySelectorAll("#filters button").forEach(x=>x.classList.toggle("on",x===b));render()});
