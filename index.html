@@ -151,12 +151,13 @@ function render(){
   const sorted=cars.slice().sort((a,b)=>(b.updated_at||"").localeCompare(a.updated_at||""));
   const done=sorted.filter(c=>doneCount(c)===STEPS.length).length;
   $("n-all").textContent=sorted.length-done;$("n-done").textContent=done;
+  const insp=filter==="insp",isDone=c=>((c.steps||{}).s||0)===2;
   const list=sorted.filter(c=>{const bo=brandOf(c);
-    if(ofil!=="all"&&String(bo.o)!==ofil)return false;if(bfil!=="all"&&bo.b!==bfil)return false;
-    if(filter==="insp")return((c.steps||{}).s||0)===2;
+    if(insp){if(!isDone(c))return false;if(ofil!=="all"&&String(bo.o)!==ofil)return false;return bfil==="all"||bo.b===bfil}
     return filter==="all"||(filter==="done"?doneCount(c)===STEPS.length:doneCount(c)<STEPS.length)});
+  $("ofilters").hidden=$("bfilters").hidden=!insp;
   const ob=$("ofilters");ob.replaceChildren();for(const[v,t]of[["all","全部車款"],["0","國產"],["1","進口"]]){const b=el("button",ofil===v?"on":"",t);b.dataset.o=v;ob.append(b)}
-  const bs=[...new Set(sorted.map(c=>brandOf(c)).filter(x=>ofil==="all"||String(x.o)===ofil).map(x=>x.b))].sort();
+  const bs=[...new Set(sorted.filter(isDone).map(c=>brandOf(c)).filter(x=>ofil==="all"||String(x.o)===ofil).map(x=>x.b))].sort();
   if(bfil!=="all"&&!bs.includes(bfil))bfil="all";
   const bf=$("bfilters");bf.replaceChildren();for(const v of["all",...bs]){const b=el("button",bfil===v?"on":"",v==="all"?"全部品牌":v);b.dataset.b=v;bf.append(b)}
   const g=$("grid");g.replaceChildren();
@@ -167,7 +168,7 @@ function render(){
     const av=el("button","av");av.type="button";av.dataset.id=c.id;av.dataset.a="av";av.setAttribute("aria-label",c.name+" 更換頭貼");
     const src=P.avatar?P.avatar.url:c.photo;
     if(src){const im=el("img");im.src=src;im.alt="";av.append(im)}else av.textContent=(c.name||"?").slice(0,1);
-    {const bo=brandOf(c);l.append(av,el("h2","",c.name||"未命名"),el("span","tag",(bo.o?"進口":"國產")+"・"+bo.b))}
+    {const bo=brandOf(c);l.append(av,el("h2","",c.name||"未命名"));if(isDone(c))l.append(el("span","tag",(bo.o?"進口":"國產")+"・"+bo.b))}
     h.append(l,el("span","badge"+(n===STEPS.length?" all":""),n+"/"+STEPS.length));
     const st=el("div","steps");
     for(const[k,name]of STEPS){const has=P.steps&&k in P.steps;const v=has?P.steps[k]:((c.steps||{})[k]||0);const b=el("button","st s"+v+(has?" pend":""),name);b.type="button";b.dataset.id=c.id;b.dataset.k=k;b.setAttribute("aria-label",c.name+" "+name+" "+LBL[v]+(has?"（待確認）":""));b.append(el("small","",has?LBL[v]+"?":LBL[v]));st.append(b)}
