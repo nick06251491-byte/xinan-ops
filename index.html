@@ -36,6 +36,12 @@ h1{font-family:"Noto Serif TC",serif;font-size:30px;margin:0 0 6px;line-height:1
 .st small{display:block;font-size:11px;opacity:.9}
 .st.s1{background:var(--doing);color:var(--doing-fg)}
 .st.s2{background:var(--done);color:var(--done-fg)}
+.st{border:0;font-family:inherit;cursor:pointer;width:100%}
+.st:active{transform:scale(.97)}
+.who{display:flex;gap:8px;align-items:center;margin:0 0 16px;flex-wrap:wrap;font-size:13.5px;color:var(--mute)}
+.who input{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:150px}
+.who input.need{border-color:var(--gold)}
+.tag{font-size:10.5px;border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-right:4px}
 .price{font:700 20px "Noto Serif TC",serif;color:var(--gold)}
 .price small{font:400 12px "Noto Sans TC",sans-serif;color:var(--mute);margin-left:3px}
 .note{font-size:13.5px;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);border-radius:8px;padding:8px 10px}
@@ -50,7 +56,8 @@ footer{margin-top:28px;font-size:12px;color:var(--mute)}
 <header><div class="wrap"><div class="brand">新安汽車<small>整備進度</small></div></div></header>
 <main><div class="wrap">
   <h1>每台車整備到哪裡</h1>
-  <p class="sub">順序：過戶、認證、修理、洗車、拍照、定價。資料由 LINE 群組同步，每 60 秒自動更新。</p>
+  <p class="sub">順序：過戶、認證、修理、洗車、拍照、定價。點格子切換狀態：未做、進行中、完成，大家的畫面會同步。LINE 群組的進度也會同步進來。</p>
+  <label class="who">你的名字（記錄是誰改的）<input id="me" maxlength="12" placeholder="例如：小王"></label>
   <div class="stats">
     <div><b id="n-all">0</b><span>整備中</span></div>
     <div><b id="n-done">0</b><span>全部完成</span></div>
@@ -64,38 +71,69 @@ footer{margin-top:28px;font-size:12px;color:var(--mute)}
   <footer id="foot"></footer>
 </div></main>
 <script>
+const SB="https://aaltpysmoejezdwzhmur.supabase.co/rest/v1",KEY="sb_publishable_VKq846Cfaik7DZSwZOJ2sw_sfZZU3WS";
+const H={apikey:KEY,Authorization:"Bearer "+KEY,"Content-Type":"application/json"};
 const STEPS=[["t","過戶"],["c","認證"],["r","修理"],["w","洗車"],["p","拍照"],["g","定價"]];
 const LBL=["未做","進行中","完成"];
-let data={cars:[]},filter="all";
+let cars=[],logs={},filter="all",busy=false;
 const $=id=>document.getElementById(id);
 function fmt(s){const d=new Date(s);if(isNaN(d))return"";return(d.getMonth()+1)+"/"+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}
 function doneCount(c){return STEPS.filter(([k])=>(c.steps||{})[k]===2).length}
 function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
+try{$("me").value=localStorage.getItem("xo_me")||""}catch(e){}
+$("me").addEventListener("input",()=>{try{localStorage.setItem("xo_me",$("me").value.trim())}catch(e){}$("me").classList.remove("need")});
 function render(){
-  const cars=(data.cars||[]).slice().sort((a,b)=>{const la=(a.log&&a.log[0]&&a.log[0].time)||"",lb=(b.log&&b.log[0]&&b.log[0].time)||"";return lb.localeCompare(la)});
-  const done=cars.filter(c=>doneCount(c)===6).length;
-  $("n-all").textContent=cars.length-done;$("n-done").textContent=done;
-  const list=cars.filter(c=>filter==="all"||(filter==="done"?doneCount(c)===6:doneCount(c)<6));
+  const sorted=cars.slice().sort((a,b)=>(b.updated_at||"").localeCompare(a.updated_at||""));
+  const done=sorted.filter(c=>doneCount(c)===6).length;
+  $("n-all").textContent=sorted.length-done;$("n-done").textContent=done;
+  const list=sorted.filter(c=>filter==="all"||(filter==="done"?doneCount(c)===6:doneCount(c)<6));
   const g=$("grid");g.replaceChildren();
-  if(!list.length){g.append(el("div","empty","目前沒有符合的車輛"))}
+  if(!list.length)g.append(el("div","empty","目前沒有符合的車輛"));
   for(const c of list){
     const n=doneCount(c),card=el("div","car");
     const h=el("div","car-h");h.append(el("h2","",c.name||"未命名"),el("span","badge"+(n===6?" all":""),n+"/6"));
     const st=el("div","steps");
-    for(const[k,name]of STEPS){const v=(c.steps||{})[k]||0;const s=el("div","st s"+v,name);s.append(el("small","",LBL[v]));st.append(s)}
+    for(const[k,name]of STEPS){const v=(c.steps||{})[k]||0;const b=el("button","st s"+v,name);b.type="button";b.dataset.id=c.id;b.dataset.k=k;b.setAttribute("aria-label",c.name+" "+name+" "+LBL[v]);b.append(el("small","",LBL[v]));st.append(b)}
     card.append(h,st);
-    if(c.price!=null&&c.price!=="")card.append(Object.assign(el("div","price",c.price+" 萬"),{}));
+    if(c.price!=null&&c.price!=="")card.append(el("div","price",c.price+" 萬"));
     if(c.note)card.append(el("div","note",c.note));
-    if(c.log&&c.log.length){const ul=el("ul","log");
-      for(const l of c.log.slice(0,4)){const li=el("li");const b=el("b","",l.who||"");li.append(fmt(l.time)+"　",b,"　"+(l.text||""));ul.append(li)}
+    const L=logs[c.id]||[];
+    if(L.length){const ul=el("ul","log");
+      for(const l of L.slice(0,4)){const li=el("li");li.append(fmt(l.at)+"　");if(l.src==="LINE")li.append(el("span","tag","LINE"));li.append(el("b","",l.who||""),"　"+(l.text||""));ul.append(li)}
       card.append(ul)}
     g.append(card)}
-  $("foot").textContent=data.updated?"最後同步："+fmt(data.updated):"";
+  const last=cars.reduce((m,c)=>(c.updated_at||"")>m?c.updated_at:m,"");
+  $("foot").textContent=last?"最後更新："+fmt(last):"";
 }
+async function load(){
+  if(busy)return;
+  try{
+    const [a,b]=await Promise.all([
+      fetch(SB+"/cars?select=*",{headers:H,cache:"no-store"}),
+      fetch(SB+"/car_log?select=*&order=at.desc&limit=300",{headers:H,cache:"no-store"})]);
+    if(!a.ok||!b.ok)throw 0;
+    cars=await a.json();logs={};for(const l of await b.json())(logs[l.car_id]=logs[l.car_id]||[]).push(l);
+    render();
+  }catch(e){$("foot").textContent="讀取失敗，請稍後重試"}
+}
+$("grid").addEventListener("click",async e=>{
+  const b=e.target.closest(".st");if(!b)return;
+  const me=$("me").value.trim();
+  if(!me){$("me").classList.add("need");$("me").focus();return}
+  busy=true;
+  try{
+    const r=await fetch(SB+"/cars?id=eq."+encodeURIComponent(b.dataset.id)+"&select=*",{headers:H,cache:"no-store"});
+    const c=(await r.json())[0];if(!c)return;
+    const old=(c.steps||{})[b.dataset.k]||0,nv=(old+1)%3,steps={...c.steps,[b.dataset.k]:nv};
+    const nm=STEPS.find(s=>s[0]===b.dataset.k)[1];
+    await fetch(SB+"/cars?id=eq."+encodeURIComponent(c.id),{method:"PATCH",headers:H,body:JSON.stringify({steps,updated_at:new Date().toISOString()})});
+    await fetch(SB+"/car_log",{method:"POST",headers:H,body:JSON.stringify({car_id:c.id,who:me,src:"web",text:nm+" "+LBL[nv]})});
+  }catch(err){$("foot").textContent="更新失敗，請再點一次"}
+  busy=false;load();
+});
 document.getElementById("filters").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;filter=b.dataset.f;
   document.querySelectorAll("#filters button").forEach(x=>x.classList.toggle("on",x===b));render()});
-async function load(){try{const r=await fetch("data.json?t="+Date.now(),{cache:"no-store"});if(r.ok){data=await r.json();render()}}catch(e){$("foot").textContent="讀取失敗，請稍後重試"}}
-load();setInterval(load,60000);
+load();setInterval(load,8000);
 </script>
 </body>
 </html>
