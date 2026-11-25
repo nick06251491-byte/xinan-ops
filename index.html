@@ -31,7 +31,7 @@ h1{font-family:"Noto Serif TC",serif;font-size:30px;margin:0 0 6px;line-height:1
 .badge{font-size:12px;white-space:nowrap;padding:2px 9px;border-radius:999px;background:var(--todo);color:var(--mute);font-variant-numeric:tabular-nums}
 .badge.all{background:var(--done);color:var(--done-fg)}
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-@media(min-width:520px){.steps{grid-template-columns:repeat(6,1fr)}}
+@media(min-width:520px){.steps{grid-template-columns:repeat(7,1fr)}}
 .st{text-align:center;border-radius:8px;padding:8px 2px;background:var(--todo);color:var(--mute);font-size:14px;line-height:1.25}
 .st small{display:block;font-size:11px;opacity:.9}
 .st.s1{background:var(--doing);color:var(--doing-fg)}
@@ -89,7 +89,7 @@ footer{margin-top:28px;font-size:12px;color:var(--mute)}
 <header><div class="wrap"><div class="brand">新安汽車<small>整備進度</small></div></div></header>
 <main><div class="wrap">
   <h1>每台車整備到哪裡</h1>
-  <p class="sub">順序：過戶、認證、修理、洗車、拍照、定價。點格子切換狀態：未做、進行中、完成，大家的畫面會同步。LINE 群組的進度也會同步進來。</p>
+  <p class="sub">順序：過戶、認證、修理、安檢、洗車、拍照、定價。點格子切換狀態：未做、進行中、完成，大家的畫面會同步。LINE 群組的進度也會同步進來。</p>
   <label class="who">我是<select id="me"><option value="">請選擇</option><option value="傑哥">傑哥</option><option value="阿輝">阿輝</option><option value="阿軒">阿軒</option><option value="祐齊">祐齊</option><option value="阿瑋">阿瑋</option><option value="nick">nick</option></select></label>
   <div class="stats">
     <div><b id="n-all">0</b><span>整備中</span></div>
@@ -116,7 +116,7 @@ footer{margin-top:28px;font-size:12px;color:var(--mute)}
 <script>
 const BASE="https://aaltpysmoejezdwzhmur.supabase.co",SB=BASE+"/rest/v1",KEY="sb_publishable_VKq846Cfaik7DZSwZOJ2sw_sfZZU3WS";
 const H={apikey:KEY,Authorization:"Bearer "+KEY,"Content-Type":"application/json"};
-const STEPS=[["t","過戶"],["c","認證"],["r","修理"],["w","洗車"],["p","拍照"],["g","定價"]];
+const STEPS=[["t","過戶"],["c","認證"],["r","修理"],["s","安檢"],["w","洗車"],["p","拍照"],["g","定價"]];
 const LBL=["未做","進行中","完成"];
 let cars=[],logs={},filter="all",busy=false,pend={},sending=false,newPhoto=null,target=null;
 const $=id=>document.getElementById(id);
@@ -143,9 +143,9 @@ function render(){
   const keep={};document.querySelectorAll(".add").forEach(f=>{const v=f.querySelector("input").value;if(v)keep[f.dataset.id]=v});
   const active=document.activeElement&&document.activeElement.closest&&document.activeElement.closest(".add");const activeId=active&&active.dataset.id;
   const sorted=cars.slice().sort((a,b)=>(b.updated_at||"").localeCompare(a.updated_at||""));
-  const done=sorted.filter(c=>doneCount(c)===6).length;
+  const done=sorted.filter(c=>doneCount(c)===STEPS.length).length;
   $("n-all").textContent=sorted.length-done;$("n-done").textContent=done;
-  const list=sorted.filter(c=>filter==="all"||(filter==="done"?doneCount(c)===6:doneCount(c)<6));
+  const list=sorted.filter(c=>filter==="all"||(filter==="done"?doneCount(c)===STEPS.length:doneCount(c)<STEPS.length));
   const g=$("grid");g.replaceChildren();
   if(!list.length)g.append(el("div","empty","目前沒有符合的車輛"));
   for(const c of list){
@@ -155,7 +155,7 @@ function render(){
     const src=P.avatar?P.avatar.url:c.photo;
     if(src){const im=el("img");im.src=src;im.alt="";av.append(im)}else av.textContent=(c.name||"?").slice(0,1);
     l.append(av,el("h2","",c.name||"未命名"));
-    h.append(l,el("span","badge"+(n===6?" all":""),n+"/6"));
+    h.append(l,el("span","badge"+(n===STEPS.length?" all":""),n+"/"+STEPS.length));
     const st=el("div","steps");
     for(const[k,name]of STEPS){const has=P.steps&&k in P.steps;const v=has?P.steps[k]:((c.steps||{})[k]||0);const b=el("button","st s"+v+(has?" pend":""),name);b.type="button";b.dataset.id=c.id;b.dataset.k=k;b.setAttribute("aria-label",c.name+" "+name+" "+LBL[v]+(has?"（待確認）":""));b.append(el("small","",has?LBL[v]+"?":LBL[v]));st.append(b)}
     card.append(h,st);
